@@ -11,9 +11,16 @@ interface Props {
   lenny_take?: string;
   so_what?: string;
   classic_callback?: { classicId: string; relation: string; note: string };
-  source_name?: string;
-  source_cron?: string;
-  collected_at?: string;
+  source?: {
+    name?: string;
+    tier?: string;
+    description?: string;
+    url?: string;
+  };
+  curator?: string; // from tags `via:{name}`
+  source_cron?: string; // briefingType
+  published_at?: string; // article publish date (preferred)
+  collected_at?: string; // agent collection date (fallback)
   existing_feedback?: string;
 }
 
@@ -26,11 +33,15 @@ export function EvalItem({
   lenny_take,
   so_what,
   classic_callback,
-  source_name,
+  source,
+  curator,
   source_cron,
+  published_at,
   collected_at,
   existing_feedback,
 }: Props) {
+  const displayDate = published_at ?? collected_at;
+  const isCollectedFallback = !published_at && Boolean(collected_at);
   const [feedback, setFeedback] = useState(existing_feedback ?? "");
   const [saving, setSaving] = useState(false);
   const [savedAt, setSavedAt] = useState<string | null>(null);
@@ -81,12 +92,62 @@ export function EvalItem({
           ) : (
             <h3 className="font-medium">{title}</h3>
           )}
-          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-500 dark:text-zinc-500">
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-500 dark:text-zinc-500">
             <span>{item_type}</span>
-            {source_name && <span>· {source_name}</span>}
-            {source_cron && <span>· {source_cron}</span>}
-            {collected_at && (
-              <time>· {new Date(collected_at).toLocaleDateString("zh-CN")}</time>
+            {source?.name && (
+              <>
+                <span>·</span>
+                {source.url ? (
+                  <a
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-zinc-700 hover:underline dark:hover:text-zinc-300"
+                    title={source.description ?? source.name}
+                  >
+                    {source.name}
+                  </a>
+                ) : (
+                  <span title={source.description ?? source.name}>{source.name}</span>
+                )}
+                {source.tier && (
+                  <span
+                    className="rounded bg-zinc-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                    title="Source tier"
+                  >
+                    {source.tier}
+                  </span>
+                )}
+              </>
+            )}
+            {curator && (
+              <>
+                <span>·</span>
+                <span className="text-zinc-500">via {curator}</span>
+              </>
+            )}
+            {source_cron && (
+              <>
+                <span>·</span>
+                <span>{source_cron}</span>
+              </>
+            )}
+            {displayDate && (
+              <>
+                <span>·</span>
+                <time
+                  dateTime={displayDate}
+                  title={
+                    isCollectedFallback
+                      ? `agent 抓取时间（无原始 publishedAt）`
+                      : `原文发布时间`
+                  }
+                  className={isCollectedFallback ? "italic" : undefined}
+                >
+                  {new Date(displayDate).toLocaleDateString("zh-CN")}
+                  {isCollectedFallback && " ⓘ"}
+                </time>
+              </>
             )}
           </div>
         </div>

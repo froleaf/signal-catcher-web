@@ -2,13 +2,52 @@ import Link from "next/link";
 import { getJsonl } from "@/lib/github";
 import { getMaterials, getSources, listWeeks } from "@/lib/ontology";
 import { refId } from "@/lib/types";
-import type { EvalLogEntry } from "@/lib/types";
+import type { EvalLogEntry, Material, Source } from "@/lib/types";
 import { EvalItem } from "./EvalItem";
 
 export const dynamic = "force-static";
 export const revalidate = false;
 
 const RECENT_DAYS = 14;
+
+/** Pick `via:{name}` curator out of Material.tags. */
+function extractCurator(tags?: string[]): string | undefined {
+  if (!tags) return undefined;
+  for (const t of tags) {
+    if (t.startsWith("via:")) return t.slice(4).trim();
+  }
+  return undefined;
+}
+
+/** Pull all the props EvalItem cares about from a Material + Source. */
+function buildEvalProps(m: Material, src: Source | null | undefined) {
+  type WithExtraFields = {
+    lennyTake?: string;
+    soWhat?: string;
+    classicCallback?: { classicId: string; relation: string; note: string };
+  };
+  const extra = m as WithExtraFields;
+  return {
+    title: m.title,
+    url: m.url,
+    summary: m.summary,
+    lenny_take: extra.lennyTake,
+    so_what: extra.soWhat,
+    classic_callback: extra.classicCallback,
+    source: src
+      ? {
+          name: src.name,
+          tier: src.tier,
+          description: src.description,
+          url: src.url,
+        }
+      : undefined,
+    curator: extractCurator(m.tags),
+    source_cron: m.briefingType,
+    published_at: m.publishedAt,
+    collected_at: m.collectedAt,
+  };
+}
 
 export default async function EvalIndexPage() {
   const [materials, sources, evalLog, weeks] = await Promise.all([
@@ -83,15 +122,7 @@ export default async function EvalIndexPage() {
                   key={m["@id"]}
                   item_id={m["@id"]}
                   item_type="Material"
-                  title={m.title}
-                  url={m.url}
-                  summary={m.summary}
-                  lenny_take={(m as { lennyTake?: string }).lennyTake}
-                  so_what={(m as { soWhat?: string }).soWhat}
-                  classic_callback={(m as { classicCallback?: { classicId: string; relation: string; note: string } }).classicCallback}
-                  source_name={src?.name}
-                  source_cron={m.briefingType}
-                  collected_at={m.collectedAt}
+                  {...buildEvalProps(m, src)}
                 />
               );
             })}
@@ -112,15 +143,7 @@ export default async function EvalIndexPage() {
                   key={m["@id"]}
                   item_id={m["@id"]}
                   item_type="Material"
-                  title={m.title}
-                  url={m.url}
-                  summary={m.summary}
-                  lenny_take={(m as { lennyTake?: string }).lennyTake}
-                  so_what={(m as { soWhat?: string }).soWhat}
-                  classic_callback={(m as { classicCallback?: { classicId: string; relation: string; note: string } }).classicCallback}
-                  source_name={src?.name}
-                  source_cron={m.briefingType}
-                  collected_at={m.collectedAt}
+                  {...buildEvalProps(m, src)}
                   existing_feedback={fbList[fbList.length - 1]}
                 />
               );
