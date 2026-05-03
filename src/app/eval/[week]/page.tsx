@@ -3,6 +3,7 @@ import { getAuditData, getMaterials, getSources, listWeeks } from "@/lib/ontolog
 import { refId } from "@/lib/types";
 import type { EvalLogEntry, Material, Source } from "@/lib/types";
 import { EvalItem } from "../EvalItem";
+import { SubmitBar } from "../SubmitBar";
 
 function extractCurator(tags?: string[]): string | undefined {
   if (!tags) return undefined;
@@ -116,6 +117,8 @@ export default async function EvalWeekPage({
           {inWeek.length} 条 · 已评 {evaluated.length} · 待评 {pending.length}
         </div>
       </header>
+
+      <SubmitBar />
 
       {pending.length === 0 && evaluated.length === 0 && (
         <div className="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900">

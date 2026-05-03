@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { discardDraft, getDraft, setDraft, subscribe } from "@/lib/evalDrafts";
 
 interface Props {
   item_id: string;
@@ -17,10 +18,10 @@ interface Props {
     description?: string;
     url?: string;
   };
-  curator?: string; // from tags `via:{name}`
-  source_cron?: string; // briefingType
-  published_at?: string; // article publish date (preferred)
-  collected_at?: string; // agent collection date (fallback)
+  curator?: string;
+  source_cron?: string;
+  published_at?: string;
+  collected_at?: string;
   existing_feedback?: string;
 }
 
@@ -42,39 +43,44 @@ export function EvalItem({
 }: Props) {
   const displayDate = published_at ?? collected_at;
   const isCollectedFallback = !published_at && Boolean(collected_at);
-  const [feedback, setFeedback] = useState(existing_feedback ?? "");
-  const [saving, setSaving] = useState(false);
-  const [savedAt, setSavedAt] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const hasExisting = Boolean(existing_feedback);
 
-  async function handleSave() {
-    if (!feedback.trim()) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/eval", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+  // Initialize from localStorage (set in effect to avoid SSR mismatch).
+  const [draft, setDraftState] = useState("");
+  const [isHydrated, setIsHydrated] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setIsHydrated(true);
+    const existing = getDraft(item_id);
+    if (existing) setDraftState(existing.feedback);
+    return subscribe(() => {
+      const cur = getDraft(item_id);
+      setDraftState(cur?.feedback ?? "");
+    });
+  }, [item_id]);
+
+  function handleChange(value: string) {
+    setDraftState(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      if (value.trim()) {
+        setDraft({
           item_id,
           item_type,
-          feedback,
+          feedback: value,
           source: source_cron,
-        }),
-      });
-      if (!res.ok) {
-        const detail = await res.json().catch(() => ({}));
-        throw new Error(detail.error || `HTTP ${res.status}`);
+        });
+      } else {
+        discardDraft(item_id);
       }
-      setSavedAt(new Date().toLocaleTimeString("zh-CN"));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "save failed");
-    } finally {
-      setSaving(false);
-    }
+    }, 300);
   }
 
-  const hasExisting = Boolean(existing_feedback);
+  function handleDiscard() {
+    setDraftState("");
+    discardDraft(item_id);
+  }
 
   return (
     <li className="rounded-lg border border-zinc-200 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900">
@@ -123,7 +129,7 @@ export function EvalItem({
             {curator && (
               <>
                 <span>·</span>
-                <span className="text-zinc-500">via {curator}</span>
+                <span>via {curator}</span>
               </>
             )}
             {source_cron && (
@@ -151,11 +157,18 @@ export function EvalItem({
             )}
           </div>
         </div>
-        {hasExisting && !savedAt && (
-          <span className="shrink-0 rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
-            ✓ 已评
-          </span>
-        )}
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          {hasExisting && (
+            <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
+              ✓ 已评
+            </span>
+          )}
+          {isHydrated && draft.trim() && (
+            <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+              📝 草稿
+            </span>
+          )}
+        </div>
       </div>
 
       {summary && (
@@ -200,32 +213,27 @@ export function EvalItem({
 
       <div className="mt-4">
         <textarea
-          value={feedback}
-          onChange={(e) => setFeedback(e.target.value)}
-          placeholder="写下你的反馈：质量、深度、Lenny's Take 是否到位、应该走哪条线、为什么……（free text）"
+          value={draft}
+          onChange={(e) => handleChange(e.target.value)}
+          placeholder={
+            hasExisting
+              ? "追加新反馈（也会先缓存，等你点上方批量提交）……"
+              : "写下你的反馈：质量、深度、Lenny's Take 是否到位、应该走哪条线、为什么……（free text，自动缓存）"
+          }
           rows={3}
           className="w-full rounded-md border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm placeholder:text-zinc-400 focus:border-zinc-500 focus:outline-none dark:border-zinc-700 dark:bg-zinc-950 dark:placeholder:text-zinc-600"
         />
-        <div className="mt-2 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving || !feedback.trim()}
-            className="rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-300 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300 dark:disabled:bg-zinc-700"
-          >
-            {saving ? "保存中…" : hasExisting ? "追加反馈" : "保存"}
-          </button>
-          {savedAt && (
-            <span className="text-xs text-emerald-700 dark:text-emerald-300">
-              已保存 · {savedAt}
-            </span>
-          )}
-          {error && (
-            <span className="text-xs text-red-600 dark:text-red-400">
-              ✗ {error}
-            </span>
-          )}
-        </div>
+        {isHydrated && draft.trim() && (
+          <div className="mt-1 flex items-center justify-end gap-3 text-xs">
+            <button
+              type="button"
+              onClick={handleDiscard}
+              className="text-zinc-500 underline-offset-2 hover:text-zinc-700 hover:underline dark:hover:text-zinc-300"
+            >
+              丢弃此条草稿
+            </button>
+          </div>
+        )}
       </div>
     </li>
   );

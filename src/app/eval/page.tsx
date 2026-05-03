@@ -4,6 +4,7 @@ import { getMaterials, getSources, listWeeks } from "@/lib/ontology";
 import { refId } from "@/lib/types";
 import type { EvalLogEntry, Material, Source } from "@/lib/types";
 import { EvalItem } from "./EvalItem";
+import { SubmitBar } from "./SubmitBar";
 
 export const dynamic = "force-static";
 export const revalidate = false;
@@ -103,6 +104,8 @@ export default async function EvalIndexPage() {
           </div>
         )}
       </header>
+
+      <SubmitBar />
 
       {pending.length === 0 && evaluated.length === 0 && (
         <div className="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900">
