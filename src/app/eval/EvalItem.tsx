@@ -8,6 +8,9 @@ interface Props {
   title: string;
   url?: string;
   summary?: string;
+  lenny_take?: string;
+  so_what?: string;
+  classic_callback?: { classicId: string; relation: string; note: string };
   source_name?: string;
   source_cron?: string;
   collected_at?: string;
@@ -20,6 +23,9 @@ export function EvalItem({
   title,
   url,
   summary,
+  lenny_take,
+  so_what,
+  classic_callback,
   source_name,
   source_cron,
   collected_at,
@@ -95,6 +101,40 @@ export function EvalItem({
         <p className="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
           {summary}
         </p>
+      )}
+
+      {lenny_take && (
+        <div className="mt-3 rounded border-l-2 border-amber-400 bg-amber-50 px-3 py-2 dark:border-amber-600 dark:bg-amber-950/30">
+          <div className="text-xs font-medium uppercase tracking-wide text-amber-800 dark:text-amber-300">
+            Lenny&apos;s Take
+          </div>
+          <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-zinc-700 dark:text-zinc-300">
+            {lenny_take}
+          </p>
+        </div>
+      )}
+
+      {so_what && (
+        <div className="mt-2 rounded border-l-2 border-sky-400 bg-sky-50 px-3 py-2 dark:border-sky-600 dark:bg-sky-950/30">
+          <div className="text-xs font-medium uppercase tracking-wide text-sky-800 dark:text-sky-300">
+            So what
+          </div>
+          <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-zinc-700 dark:text-zinc-300">
+            {so_what}
+          </p>
+        </div>
+      )}
+
+      {classic_callback && (
+        <div className="mt-2 rounded border-l-2 border-violet-400 bg-violet-50 px-3 py-2 dark:border-violet-600 dark:bg-violet-950/30">
+          <div className="text-xs font-medium uppercase tracking-wide text-violet-800 dark:text-violet-300">
+            经典回溯 · {classic_callback.relation}
+          </div>
+          <p className="mt-1 text-xs text-zinc-500">{classic_callback.classicId}</p>
+          <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-zinc-700 dark:text-zinc-300">
+            {classic_callback.note}
+          </p>
+        </div>
       )}
 
       <div className="mt-4">

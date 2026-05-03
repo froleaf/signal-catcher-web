@@ -86,6 +86,9 @@ export default async function EvalIndexPage() {
                   title={m.title}
                   url={m.url}
                   summary={m.summary}
+                  lenny_take={(m as { lennyTake?: string }).lennyTake}
+                  so_what={(m as { soWhat?: string }).soWhat}
+                  classic_callback={(m as { classicCallback?: { classicId: string; relation: string; note: string } }).classicCallback}
                   source_name={src?.name}
                   source_cron={m.briefingType}
                   collected_at={m.collectedAt}
@@ -112,6 +115,9 @@ export default async function EvalIndexPage() {
                   title={m.title}
                   url={m.url}
                   summary={m.summary}
+                  lenny_take={(m as { lennyTake?: string }).lennyTake}
+                  so_what={(m as { soWhat?: string }).soWhat}
+                  classic_callback={(m as { classicCallback?: { classicId: string; relation: string; note: string } }).classicCallback}
                   source_name={src?.name}
                   source_cron={m.briefingType}
                   collected_at={m.collectedAt}

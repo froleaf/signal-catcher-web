@@ -39,6 +39,16 @@ export interface Material extends OntologyNode {
   mentionedPersons?: EntityRef[];
   mentionedProducts?: EntityRef[];
   reflections?: EntityRef[];
+  /** Telegram 推送中 `> Lenny's Take:` 后的正文（条件 A 框架解读 / 条件 B 模型自身深度解读）。可空 */
+  lennyTake?: string;
+  /** Telegram 推送中 `> So what:` 后的内容。可空 */
+  soWhat?: string;
+  /** Telegram 经典回溯，可空 */
+  classicCallback?: {
+    classicId: string;
+    relation: "resonance" | "conflict";
+    note: string;
+  };
 }
 
 export interface Signal extends OntologyNode {
