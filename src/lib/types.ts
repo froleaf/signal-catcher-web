@@ -78,16 +78,23 @@ export interface CompanyEntity extends OntologyNode {
   aliases?: string[];
   type?: string;
   url?: string;
+  relatedPersons?: EntityRef[];
+  relatedProducts?: EntityRef[];
   mentionedIn?: EntityRef[];
   firstMentionedAt?: string;
   lastMentionedAt?: string;
+  rollingSummary?: string;
 }
 export interface PersonEntity extends OntologyNode {
   "@type": "Person";
   aliases?: string[];
   role?: string;
   affiliations?: EntityRef[];
+  handles?: Record<string, string>;
   mentionedIn?: EntityRef[];
+  firstMentionedAt?: string;
+  lastMentionedAt?: string;
+  rollingSummary?: string;
 }
 export interface ProductEntity extends OntologyNode {
   "@type": "Product";
@@ -95,7 +102,11 @@ export interface ProductEntity extends OntologyNode {
   company?: EntityRef;
   category?: string;
   status?: string;
+  url?: string;
   mentionedIn?: EntityRef[];
+  firstMentionedAt?: string;
+  lastMentionedAt?: string;
+  rollingSummary?: string;
 }
 
 export interface Ontology {
