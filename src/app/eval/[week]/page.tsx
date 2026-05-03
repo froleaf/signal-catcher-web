@@ -1,21 +1,48 @@
-import Link from "next/link";
 import { getJsonl } from "@/lib/github";
-import { getMaterials, getSources, listWeeks } from "@/lib/ontology";
+import { getAuditData, getMaterials, getSources, listWeeks } from "@/lib/ontology";
 import { refId } from "@/lib/types";
 import type { EvalLogEntry } from "@/lib/types";
-import { EvalItem } from "./EvalItem";
+import { EvalItem } from "../EvalItem";
 
 export const dynamic = "force-static";
 export const revalidate = false;
 
-const RECENT_DAYS = 14;
+export async function generateStaticParams() {
+  const weeks = await listWeeks();
+  return weeks.map((week) => ({ week }));
+}
 
-export default async function EvalIndexPage() {
-  const [materials, sources, evalLog, weeks] = await Promise.all([
+/** Convert "YYYY-WNN" ISO week into [start, end) UTC dates. */
+function isoWeekRange(week: string): [Date, Date] | null {
+  const m = week.match(/^(\d{4})-W(\d{2})$/);
+  if (!m) return null;
+  const [, yearStr, weekStr] = m;
+  const year = parseInt(yearStr, 10);
+  const w = parseInt(weekStr, 10);
+
+  // ISO week 1 is the week containing the first Thursday of the year.
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const dayOfWeek = jan4.getUTCDay() || 7;
+  const week1Monday = new Date(jan4);
+  week1Monday.setUTCDate(jan4.getUTCDate() - dayOfWeek + 1);
+  const start = new Date(week1Monday);
+  start.setUTCDate(week1Monday.getUTCDate() + (w - 1) * 7);
+  const end = new Date(start);
+  end.setUTCDate(start.getUTCDate() + 7);
+  return [start, end];
+}
+
+export default async function EvalWeekPage({
+  params,
+}: {
+  params: Promise<{ week: string }>;
+}) {
+  const { week } = await params;
+  const [audit, materials, sources, evalLog] = await Promise.all([
+    getAuditData(week),
     getMaterials(),
     getSources(),
     getJsonl<EvalLogEntry>("state/eval-log.jsonl"),
-    listWeeks(),
   ]);
 
   const sourceById = new Map(sources.map((s) => [s["@id"], s]));
@@ -26,54 +53,42 @@ export default async function EvalIndexPage() {
     feedbackByItem.set(entry.item_id, list);
   }
 
-  const cutoff = new Date(Date.now() - RECENT_DAYS * 24 * 60 * 60 * 1000);
-  const recent = materials
-    .filter((m) => {
-      const ts = m.collectedAt ? new Date(m.collectedAt) : null;
-      return ts !== null && ts >= cutoff;
-    })
-    .sort((a, b) => (a.collectedAt > b.collectedAt ? -1 : 1));
+  // Filter materials to those collected in this week's range.
+  const range = isoWeekRange(week);
+  const inWeek = range
+    ? materials.filter((m) => {
+        const ts = m.collectedAt ? new Date(m.collectedAt) : null;
+        return ts && ts >= range[0] && ts < range[1];
+      })
+    : [];
 
-  const evaluated = recent.filter((m) => feedbackByItem.has(m["@id"]));
-  const pending = recent.filter((m) => !feedbackByItem.has(m["@id"]));
+  const evaluated = inWeek.filter((m) => feedbackByItem.has(m["@id"]));
+  const pending = inWeek.filter((m) => !feedbackByItem.has(m["@id"]));
 
   return (
     <div className="space-y-10">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Eval 工作台</h1>
+        <p className="text-sm text-zinc-500">{week}</p>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight">Eval · {week}</h1>
         <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-          对每条 Material 给反馈。第一版 free text，等数据攒够了再反推维度。
+          {audit
+            ? "本周已生成 weekly digest。下面是这周推送过的 Material。"
+            : "本周还没有 weekly digest。"}
         </p>
-        <div className="mt-3 flex gap-3 text-sm text-zinc-500">
-          <span>近 {RECENT_DAYS} 天 · {recent.length} 条</span>
-          <span>· 已评 {evaluated.length}</span>
-          <span>· 待评 {pending.length}</span>
+        <div className="mt-3 text-sm text-zinc-500">
+          {inWeek.length} 条 · 已评 {evaluated.length} · 待评 {pending.length}
         </div>
-        {weeks.length > 0 && (
-          <div className="mt-3 flex gap-2 text-sm">
-            <span className="text-zinc-500">按周浏览:</span>
-            {weeks.slice(0, 6).map((w) => (
-              <Link
-                key={w}
-                href={`/eval/${w}`}
-                className="text-zinc-700 underline underline-offset-2 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
-              >
-                {w}
-              </Link>
-            ))}
-          </div>
-        )}
       </header>
 
       {pending.length === 0 && evaluated.length === 0 && (
         <div className="rounded-lg border border-dashed border-zinc-300 bg-white p-6 text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900">
-          近 {RECENT_DAYS} 天还没有 Material 被推送或收录。新的早晚报跑过后这里会有内容。
+          这一周没有匹配到任何 Material。
         </div>
       )}
 
       {pending.length > 0 && (
         <section>
-          <h2 className="mb-4 text-lg font-medium">待评 ({pending.length})</h2>
+          <h2 className="mb-4 text-lg font-medium">待评</h2>
           <ul className="space-y-3">
             {pending.map((m) => {
               const srcId = refId(m.source);
@@ -98,7 +113,7 @@ export default async function EvalIndexPage() {
 
       {evaluated.length > 0 && (
         <section>
-          <h2 className="mb-4 text-lg font-medium">已评 ({evaluated.length})</h2>
+          <h2 className="mb-4 text-lg font-medium">已评</h2>
           <ul className="space-y-3">
             {evaluated.map((m) => {
               const srcId = refId(m.source);
