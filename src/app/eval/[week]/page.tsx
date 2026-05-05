@@ -1,5 +1,5 @@
 import { getJsonl } from "@/lib/github";
-import { getAuditData, getMaterials, getSources, listWeeks } from "@/lib/ontology";
+import { getAuditData, getMaterials, getSources } from "@/lib/ontology";
 import { refId } from "@/lib/types";
 import type { EvalLogEntry, Material, Source } from "@/lib/types";
 import { EvalItem } from "../EvalItem";
@@ -42,13 +42,7 @@ function buildEvalProps(m: Material, src: Source | null | undefined) {
   };
 }
 
-export const dynamic = "force-static";
-export const revalidate = false;
-
-export async function generateStaticParams() {
-  const weeks = await listWeeks();
-  return weeks.map((week) => ({ week }));
-}
+export const dynamic = "force-dynamic";
 
 /** Convert "YYYY-WNN" ISO week into [start, end) UTC dates. */
 function isoWeekRange(week: string): [Date, Date] | null {

@@ -6,8 +6,7 @@ import type { EvalLogEntry, Material, Source } from "@/lib/types";
 import { EvalItem } from "./EvalItem";
 import { SubmitBar } from "./SubmitBar";
 
-export const dynamic = "force-static";
-export const revalidate = false;
+export const dynamic = "force-dynamic";
 
 const RECENT_DAYS = 14;
 
