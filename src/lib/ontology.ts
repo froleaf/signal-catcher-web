@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { getJson, listDir } from "./github";
 import type {
   AuditData,
@@ -13,15 +14,15 @@ import type {
   TopicCluster,
 } from "./types";
 
-let cached: Ontology | null = null;
-
-/** Load the full Signal ontology. Cached per build. */
-export async function loadOntology(): Promise<Ontology> {
-  if (cached) return cached;
+/**
+ * Load the full Signal ontology. Deduplicated per request (React cache),
+ * not per process — module-level caching would freeze data across requests
+ * on warm Vercel Function instances and defeat `force-dynamic`.
+ */
+export const loadOntology = cache(async (): Promise<Ontology> => {
   const o = await getJson<Ontology>("signal/ontology.jsonld");
-  cached = o ?? { "@graph": [] };
-  return cached;
-}
+  return o ?? { "@graph": [] };
+});
 
 export function nodesByType<T extends OntologyNode>(
   ontology: Ontology,
