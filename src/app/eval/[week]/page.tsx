@@ -1,46 +1,9 @@
 import { getJsonl } from "@/lib/github";
 import { getAuditData, getMaterials, getSources } from "@/lib/ontology";
-import { refId } from "@/lib/types";
-import type { EvalLogEntry, Material, Source } from "@/lib/types";
+import { buildEvalItems } from "@/lib/evalView";
+import type { EvalLogEntry, PushedMessage } from "@/lib/types";
 import { EvalItem } from "../EvalItem";
 import { SubmitBar } from "../SubmitBar";
-
-function extractCurator(tags?: string[]): string | undefined {
-  if (!tags) return undefined;
-  for (const t of tags) {
-    if (t.startsWith("via:")) return t.slice(4).trim();
-  }
-  return undefined;
-}
-
-function buildEvalProps(m: Material, src: Source | null | undefined) {
-  type WithExtraFields = {
-    lennyTake?: string;
-    soWhat?: string;
-    classicCallback?: { classicId: string; relation: string; note: string };
-  };
-  const extra = m as WithExtraFields;
-  return {
-    title: m.title,
-    url: m.url,
-    summary: m.summary,
-    lenny_take: extra.lennyTake,
-    so_what: extra.soWhat,
-    classic_callback: extra.classicCallback,
-    source: src
-      ? {
-          name: src.name,
-          tier: src.tier,
-          description: src.description,
-          url: src.url,
-        }
-      : undefined,
-    curator: extractCurator(m.tags),
-    source_cron: m.briefingType,
-    published_at: m.publishedAt,
-    collected_at: m.collectedAt,
-  };
-}
 
 export const dynamic = "force-dynamic";
 
@@ -70,14 +33,14 @@ export default async function EvalWeekPage({
   params: Promise<{ week: string }>;
 }) {
   const { week } = await params;
-  const [audit, materials, sources, evalLog] = await Promise.all([
+  const [audit, materials, sources, pushedMessages, evalLog] = await Promise.all([
     getAuditData(week),
     getMaterials(),
     getSources(),
+    getJsonl<PushedMessage>("state/pushed-messages.jsonl"),
     getJsonl<EvalLogEntry>("state/eval-log.jsonl"),
   ]);
 
-  const sourceById = new Map(sources.map((s) => [s["@id"], s]));
   const feedbackByItem = new Map<string, string[]>();
   for (const entry of evalLog) {
     const list = feedbackByItem.get(entry.item_id) ?? [];
@@ -85,17 +48,19 @@ export default async function EvalWeekPage({
     feedbackByItem.set(entry.item_id, list);
   }
 
-  // Filter materials to those collected in this week's range.
   const range = isoWeekRange(week);
   const inWeek = range
-    ? materials.filter((m) => {
-        const ts = m.collectedAt ? new Date(m.collectedAt) : null;
-        return ts && ts >= range[0] && ts < range[1];
-      })
+    ? buildEvalItems(materials, pushedMessages, sources)
+        .filter((it) => {
+          if (!it.ts) return false;
+          const ts = new Date(it.ts);
+          return ts >= range[0] && ts < range[1];
+        })
+        .sort((a, b) => ((a.ts ?? "") > (b.ts ?? "") ? -1 : 1))
     : [];
 
-  const evaluated = inWeek.filter((m) => feedbackByItem.has(m["@id"]));
-  const pending = inWeek.filter((m) => !feedbackByItem.has(m["@id"]));
+  const evaluated = inWeek.filter((it) => feedbackByItem.has(it.item_id));
+  const pending = inWeek.filter((it) => !feedbackByItem.has(it.item_id));
 
   return (
     <div className="space-y-10">
@@ -124,18 +89,14 @@ export default async function EvalWeekPage({
         <section>
           <h2 className="mb-4 text-lg font-medium">待评</h2>
           <ul className="space-y-3">
-            {pending.map((m) => {
-              const srcId = refId(m.source);
-              const src = srcId ? sourceById.get(srcId) : null;
-              return (
-                <EvalItem
-                  key={m["@id"]}
-                  item_id={m["@id"]}
-                  item_type="Material"
-                  {...buildEvalProps(m, src)}
-                />
-              );
-            })}
+            {pending.map((it) => (
+              <EvalItem
+                key={it.item_id}
+                item_id={it.item_id}
+                item_type="Material"
+                {...it.props}
+              />
+            ))}
           </ul>
         </section>
       )}
@@ -144,16 +105,14 @@ export default async function EvalWeekPage({
         <section>
           <h2 className="mb-4 text-lg font-medium">已评</h2>
           <ul className="space-y-3">
-            {evaluated.map((m) => {
-              const srcId = refId(m.source);
-              const src = srcId ? sourceById.get(srcId) : null;
-              const fbList = feedbackByItem.get(m["@id"]) ?? [];
+            {evaluated.map((it) => {
+              const fbList = feedbackByItem.get(it.item_id) ?? [];
               return (
                 <EvalItem
-                  key={m["@id"]}
-                  item_id={m["@id"]}
+                  key={it.item_id}
+                  item_id={it.item_id}
                   item_type="Material"
-                  {...buildEvalProps(m, src)}
+                  {...it.props}
                   existing_feedback={fbList[fbList.length - 1]}
                 />
               );

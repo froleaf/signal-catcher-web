@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { getJsonl } from "@/lib/github";
 import { getMaterials, getSources, listWeeks } from "@/lib/ontology";
-import { refId } from "@/lib/types";
-import type { EvalLogEntry, Material, Source } from "@/lib/types";
+import { buildEvalItems } from "@/lib/evalView";
+import type { EvalLogEntry, PushedMessage } from "@/lib/types";
 import { EvalItem } from "./EvalItem";
 import { SubmitBar } from "./SubmitBar";
 
@@ -10,54 +10,15 @@ export const dynamic = "force-dynamic";
 
 const RECENT_DAYS = 14;
 
-/** Pick `via:{name}` curator out of Material.tags. */
-function extractCurator(tags?: string[]): string | undefined {
-  if (!tags) return undefined;
-  for (const t of tags) {
-    if (t.startsWith("via:")) return t.slice(4).trim();
-  }
-  return undefined;
-}
-
-/** Pull all the props EvalItem cares about from a Material + Source. */
-function buildEvalProps(m: Material, src: Source | null | undefined) {
-  type WithExtraFields = {
-    lennyTake?: string;
-    soWhat?: string;
-    classicCallback?: { classicId: string; relation: string; note: string };
-  };
-  const extra = m as WithExtraFields;
-  return {
-    title: m.title,
-    url: m.url,
-    summary: m.summary,
-    lenny_take: extra.lennyTake,
-    so_what: extra.soWhat,
-    classic_callback: extra.classicCallback,
-    source: src
-      ? {
-          name: src.name,
-          tier: src.tier,
-          description: src.description,
-          url: src.url,
-        }
-      : undefined,
-    curator: extractCurator(m.tags),
-    source_cron: m.briefingType,
-    published_at: m.publishedAt,
-    collected_at: m.collectedAt,
-  };
-}
-
 export default async function EvalIndexPage() {
-  const [materials, sources, evalLog, weeks] = await Promise.all([
+  const [materials, sources, pushedMessages, evalLog, weeks] = await Promise.all([
     getMaterials(),
     getSources(),
+    getJsonl<PushedMessage>("state/pushed-messages.jsonl"),
     getJsonl<EvalLogEntry>("state/eval-log.jsonl"),
     listWeeks(),
   ]);
 
-  const sourceById = new Map(sources.map((s) => [s["@id"], s]));
   const feedbackByItem = new Map<string, string[]>();
   for (const entry of evalLog) {
     const list = feedbackByItem.get(entry.item_id) ?? [];
@@ -66,15 +27,12 @@ export default async function EvalIndexPage() {
   }
 
   const cutoff = new Date(Date.now() - RECENT_DAYS * 24 * 60 * 60 * 1000);
-  const recent = materials
-    .filter((m) => {
-      const ts = m.collectedAt ? new Date(m.collectedAt) : null;
-      return ts !== null && ts >= cutoff;
-    })
-    .sort((a, b) => (a.collectedAt > b.collectedAt ? -1 : 1));
+  const recent = buildEvalItems(materials, pushedMessages, sources)
+    .filter((it) => it.ts !== null && new Date(it.ts) >= cutoff)
+    .sort((a, b) => ((a.ts ?? "") > (b.ts ?? "") ? -1 : 1));
 
-  const evaluated = recent.filter((m) => feedbackByItem.has(m["@id"]));
-  const pending = recent.filter((m) => !feedbackByItem.has(m["@id"]));
+  const evaluated = recent.filter((it) => feedbackByItem.has(it.item_id));
+  const pending = recent.filter((it) => !feedbackByItem.has(it.item_id));
 
   return (
     <div className="space-y-10">
@@ -116,18 +74,14 @@ export default async function EvalIndexPage() {
         <section>
           <h2 className="mb-4 text-lg font-medium">待评 ({pending.length})</h2>
           <ul className="space-y-3">
-            {pending.map((m) => {
-              const srcId = refId(m.source);
-              const src = srcId ? sourceById.get(srcId) : null;
-              return (
-                <EvalItem
-                  key={m["@id"]}
-                  item_id={m["@id"]}
-                  item_type="Material"
-                  {...buildEvalProps(m, src)}
-                />
-              );
-            })}
+            {pending.map((it) => (
+              <EvalItem
+                key={it.item_id}
+                item_id={it.item_id}
+                item_type="Material"
+                {...it.props}
+              />
+            ))}
           </ul>
         </section>
       )}
@@ -136,16 +90,14 @@ export default async function EvalIndexPage() {
         <section>
           <h2 className="mb-4 text-lg font-medium">已评 ({evaluated.length})</h2>
           <ul className="space-y-3">
-            {evaluated.map((m) => {
-              const srcId = refId(m.source);
-              const src = srcId ? sourceById.get(srcId) : null;
-              const fbList = feedbackByItem.get(m["@id"]) ?? [];
+            {evaluated.map((it) => {
+              const fbList = feedbackByItem.get(it.item_id) ?? [];
               return (
                 <EvalItem
-                  key={m["@id"]}
-                  item_id={m["@id"]}
+                  key={it.item_id}
+                  item_id={it.item_id}
                   item_type="Material"
-                  {...buildEvalProps(m, src)}
+                  {...it.props}
                   existing_feedback={fbList[fbList.length - 1]}
                 />
               );

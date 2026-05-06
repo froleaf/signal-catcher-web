@@ -177,6 +177,24 @@ export interface EvalLogEntry {
   source?: string;
 }
 
+/**
+ * 1:1 archive of a Telegram push (the bytes the user actually saw).
+ * Lives at `state/pushed-messages.jsonl` in the data repo.
+ * Primary display source for `/eval` workbench cards.
+ */
+export interface PushedMessage {
+  ts: string;
+  item_id: string;
+  cron: string;
+  channel: string;
+  title: string;
+  body: string;
+  lenny_take?: string;
+  so_what?: string;
+  source_label?: string;
+  watch?: string;
+}
+
 /** Normalize an EntityRef to its @id string. */
 export function refId(ref: EntityRef | undefined): string | null {
   if (!ref) return null;

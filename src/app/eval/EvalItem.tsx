@@ -8,7 +8,8 @@ interface Props {
   item_type: "Material" | "Signal" | "Reflection";
   title: string;
   url?: string;
-  summary?: string;
+  /** Telegram 推送的正文段落（首选），或 ontology Material.summary（兜底）*/
+  body?: string;
   lenny_take?: string;
   so_what?: string;
   classic_callback?: { classicId: string; relation: string; note: string };
@@ -18,6 +19,10 @@ interface Props {
     description?: string;
     url?: string;
   };
+  /** 推送底部 `Source: ` 后的字符串（如 `IBM Newsroom`）*/
+  source_label?: string;
+  /** 推送底部 `Watch: ` 后的字符串（如 `sig_system_over_model · IBM`）*/
+  watch?: string;
   curator?: string;
   source_cron?: string;
   published_at?: string;
@@ -30,11 +35,13 @@ export function EvalItem({
   item_type,
   title,
   url,
-  summary,
+  body,
   lenny_take,
   so_what,
   classic_callback,
   source,
+  source_label,
+  watch,
   curator,
   source_cron,
   published_at,
@@ -171,10 +178,17 @@ export function EvalItem({
         </div>
       </div>
 
-      {summary && (
-        <p className="mt-3 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-          {summary}
+      {body && (
+        <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-zinc-600 dark:text-zinc-400">
+          {body}
         </p>
+      )}
+
+      {(source_label || watch) && (
+        <div className="mt-3 space-y-0.5 text-xs text-zinc-500 dark:text-zinc-500">
+          {source_label && <div>Source: {source_label}</div>}
+          {watch && <div>Watch: {watch}</div>}
+        </div>
       )}
 
       {lenny_take && (
